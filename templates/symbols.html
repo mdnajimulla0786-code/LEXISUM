@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+
+{% block title %}Symbol Table | Compiler Design{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title-group">
+    <h1>
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="30" height="30" style="color: var(--accent-blue);">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+      </svg>
+      Symbol Table Registry
+    </h1>
+    <p>Manage, search, update, and remove identifiers stored in the compiler hash table.</p>
+  </div>
+  <div class="page-actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+    <a href="/add-page" class="btn btn-primary">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+      </svg>
+      Insert Identifier
+    </a>
+    <a href="/export/csv" class="btn btn-secondary" title="Download Symbol Table as CSV">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+      Export CSV
+    </a>
+    <a href="/export/json" class="btn btn-secondary" title="Download Symbol Table as JSON">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+      </svg>
+      Export JSON
+    </a>
+    <button onclick="loadSampleSymbols()" class="btn btn-secondary" title="Load sample C code dataset">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+      </svg>
+      Load Demo
+    </button>
+    <button onclick="clearSymbolTable()" class="btn btn-danger btn-sm" title="Clear all symbols">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+      </svg>
+      Clear
+    </button>
+  </div>
+</div>
+
+<!-- Controls Bar: Search & Filters -->
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.2rem;">
+  <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+    <!-- Search Input -->
+    <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 260px;">
+      <div style="position: relative; width: 100%;">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="18" height="18" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        <input type="text" id="search-input" class="form-input" placeholder="Search identifier name (e.g. 'result', 'pi')..." style="padding-left: 2.4rem; width: 100%;" oninput="filterTable()">
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+      <select id="type-filter" class="form-select" onchange="filterTable()">
+        <option value="">All Types</option>
+        <option value="int">int</option>
+        <option value="float">float</option>
+        <option value="char">char</option>
+        <option value="double">double</option>
+        <option value="void">void</option>
+      </select>
+
+      <select id="scope-filter" class="form-select" onchange="filterTable()">
+        <option value="">All Scopes</option>
+        <option value="global">Global Only</option>
+        <option value="local">Local Only</option>
+      </select>
+
+      <select id="token-type-filter" class="form-select" onchange="filterTable()">
+        <option value="">All Categories</option>
+        <option value="identifier">Identifiers</option>
+        <option value="parameter">Parameters</option>
+        <option value="function">Functions</option>
+      </select>
+
+      <button onclick="refreshSymbols()" class="btn btn-secondary btn-sm" title="Refresh Table">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Table Card -->
+<div class="card" style="padding: 0; overflow: hidden;">
+  <div class="table-container" style="border: none; border-radius: 0;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Identifier Name</th>
+          <th>Data Type</th>
+          <th>Token Type</th>
+          <th>Value</th>
+          <th>Scope</th>
+          <th>Line #</th>
+          <th>Hash Bucket</th>
+          <th style="text-align: right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="symbols-table-body">
+        <tr>
+          <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 3rem;">
+            Loading symbol table entries...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="edit-modal" class="modal-backdrop">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3 class="modal-title">Edit Identifier</h3>
+      <button class="modal-close" onclick="closeEditModal()">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="20" height="20">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <form id="edit-form" onsubmit="submitEdit(event)">
+      <div class="form-group">
+        <label class="form-label">Identifier Name</label>
+        <input type="text" id="edit-name" class="form-input mono" disabled style="opacity: 0.7; cursor: not-allowed;">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Data Type</label>
+        <select id="edit-type" class="form-select" required>
+          <option value="int">int</option>
+          <option value="float">float</option>
+          <option value="char">char</option>
+          <option value="double">double</option>
+          <option value="void">void</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Token Category</label>
+        <select id="edit-token-type" class="form-select">
+          <option value="identifier">identifier</option>
+          <option value="parameter">parameter</option>
+          <option value="function">function</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Assigned Value</label>
+        <input type="text" id="edit-value" class="form-input mono" placeholder="e.g. 100, 3.14, 'c'">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Scope</label>
+        <input type="text" id="edit-scope" class="form-input mono" placeholder="global or funcName()" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Source Code Line Number</label>
+        <input type="number" id="edit-line" class="form-input mono" min="1" required>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allSymbols = [];
+
+async function refreshSymbols() {
+  try {
+    const res = await fetch('/symbols');
+    if (res.ok) {
+      allSymbols = await res.json();
+      renderTable(allSymbols);
+      updateNavStats();
+    }
+  } catch (err) {
+    showToast('Failed to fetch symbols: ' + err.message, 'error');
+  }
+}
+
+function renderTable(symbols) {
+  const tbody = document.getElementById('symbols-table-body');
+  if (!symbols || symbols.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 3rem;">
+          No symbols found matching your criteria.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = '';
+  symbols.forEach((sym, idx) => {
+    const baseType = (sym.type || sym.data_type || 'void').toLowerCase().replace(/[*\[\]]/g, '');
+    const typeClass = `badge-${baseType}` in {'badge-int':1,'badge-float':1,'badge-char':1,'badge-double':1,'badge-void':1}
+      ? `badge-${baseType}` : 'badge-void';
+    const isGlobal = (sym.scope || '').toLowerCase() === 'global';
+    const scopeClass = isGlobal ? 'badge-scope-global' : 'badge-scope-local';
+    const tokenType = sym.token_type || 'identifier';
+
+    let tokenBadgeStyle = 'color: #94a3b8; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03);';
+    if (tokenType === 'function') tokenBadgeStyle = 'color: #c084fc; border: 1px solid rgba(192,132,252,0.3); background: rgba(192,132,252,0.1);';
+    if (tokenType === 'parameter') tokenBadgeStyle = 'color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); background: rgba(56,189,248,0.1);';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="color: var(--text-muted); font-family: var(--font-mono); font-size: 0.8rem;">${idx + 1}</td>
+      <td>
+        <span class="sym-name" style="font-size: 0.95rem;">${escapeHtml(sym.name)}</span>
+      </td>
+      <td><span class="badge ${typeClass}">${escapeHtml(sym.type || sym.data_type)}</span></td>
+      <td>
+        <span class="badge" style="${tokenBadgeStyle}; font-size: 0.7rem; text-transform: lowercase;">
+          ${escapeHtml(tokenType)}
+        </span>
+      </td>
+      <td><span class="sym-val">${escapeHtml(sym.value !== null && sym.value !== undefined ? sym.value : 'null')}</span></td>
+      <td><span class="badge ${scopeClass}">${escapeHtml(sym.scope)}</span></td>
+      <td style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-secondary);">Line ${sym.line || sym.line_number}</td>
+      <td>
+        <span class="badge badge-hash" title="ASCII Sum % 10 = ${sym.hash_index}">
+          Bucket #${sym.hash_index}
+        </span>
+      </td>
+      <td style="text-align: right;">
+        <div style="display: inline-flex; gap: 0.5rem;">
+          <button class="btn btn-secondary btn-sm" onclick="openEditModal('${escapeHtml(sym.name)}', '${escapeHtml(sym.scope)}')">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+            Edit
+          </button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSymbol('${escapeHtml(sym.name)}', '${escapeHtml(sym.scope)}')">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+            Delete
+          </button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function filterTable() {
+  const query = document.getElementById('search-input').value.trim().toLowerCase();
+  const typeFilter = document.getElementById('type-filter').value.toLowerCase();
+  const scopeFilter = document.getElementById('scope-filter').value.toLowerCase();
+  const tokenFilter = document.getElementById('token-type-filter').value.toLowerCase();
+
+  const filtered = allSymbols.filter(sym => {
+    const nameMatch = !query || sym.name.toLowerCase().includes(query);
+    const typeVal = (sym.type || sym.data_type || '').toLowerCase();
+    const typeMatch = !typeFilter || typeVal.includes(typeFilter);
+    const tokenMatch = !tokenFilter || (sym.token_type || 'identifier').toLowerCase() === tokenFilter;
+    
+    let scopeMatch = true;
+    if (scopeFilter === 'global') {
+      scopeMatch = (sym.scope || '').toLowerCase() === 'global';
+    } else if (scopeFilter === 'local') {
+      scopeMatch = (sym.scope || '').toLowerCase() !== 'global';
+    }
+    return nameMatch && typeMatch && tokenMatch && scopeMatch;
+  });
+
+  renderTable(filtered);
+}
+
+async function deleteSymbol(name, scope) {
+  if (!confirm(`Are you sure you want to remove identifier '${name}' (scope: ${scope})?`)) {
+    return;
+  }
+  try {
+    const url = `/delete/${encodeURIComponent(name)}${scope ? `?scope=${encodeURIComponent(scope)}` : ''}`;
+    const res = await fetch(url, { method: 'DELETE' });
+    const result = await res.json();
+    if (res.ok) {
+      showToast(result.message || `Symbol '${name}' deleted.`, 'success');
+      refreshSymbols();
+    } else {
+      showToast(result.error || 'Failed to delete symbol.', 'error');
+    }
+  } catch (err) {
+    showToast('Delete error: ' + err.message, 'error');
+  }
+}
+
+async function clearSymbolTable() {
+  if (!confirm('Are you sure you want to clear all symbols from the symbol table?')) {
+    return;
+  }
+  try {
+    const res = await fetch('/api/clear', { method: 'POST' });
+    const result = await res.json();
+    if (res.ok) {
+      showToast(result.message, 'success');
+      refreshSymbols();
+    }
+  } catch (err) {
+    showToast('Failed to clear: ' + err.message, 'error');
+  }
+}
+
+function openEditModal(name, scope) {
+  const sym = allSymbols.find(s => s.name === name && (!scope || s.scope === scope));
+  if (!sym) return;
+
+  document.getElementById('edit-name').value = sym.name;
+  document.getElementById('edit-type').value = (sym.type || sym.data_type || 'int').replace(/[*\[\]]/g, '');
+  document.getElementById('edit-token-type').value = sym.token_type || 'identifier';
+  document.getElementById('edit-value').value = sym.value || '';
+  document.getElementById('edit-scope').value = sym.scope;
+  document.getElementById('edit-line').value = sym.line || sym.line_number || 1;
+
+  document.getElementById('edit-modal').classList.add('active');
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.remove('active');
+}
+
+async function submitEdit(event) {
+  event.preventDefault();
+  const name = document.getElementById('edit-name').value;
+  const payload = {
+    type: document.getElementById('edit-type').value,
+    token_type: document.getElementById('edit-token-type').value,
+    value: document.getElementById('edit-value').value,
+    scope: document.getElementById('edit-scope').value,
+    line: parseInt(document.getElementById('edit-line').value, 10) || 1
+  };
+
+  try {
+    const res = await fetch(`/update/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+    if (res.ok) {
+      showToast(result.message || 'Symbol updated successfully!', 'success');
+      closeEditModal();
+      refreshSymbols();
+    } else {
+      showToast(result.error || 'Failed to update symbol.', 'error');
+    }
+  } catch (err) {
+    showToast('Update error: ' + err.message, 'error');
+  }
+}
+
+function escapeHtml(text) {
+  if (text === null || text === undefined) return '';
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+document.addEventListener('DOMContentLoaded', refreshSymbols);
+</script>
+{% endblock %}

@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+
+{% block title %}Scope Analysis | Compiler Design{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title-group">
+    <h1>
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="30" height="30" style="color: var(--accent-cyan);">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+      </svg>
+      Scope Hierarchy & Analysis
+    </h1>
+    <p>Lexical scope resolution, global vs local scoping rules, nested block boundaries, and variable shadowing.</p>
+  </div>
+  <div class="page-actions">
+    <a href="/analyzer-page" class="btn btn-secondary">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+      </svg>
+      Analyze C Functions
+    </a>
+  </div>
+</div>
+
+<!-- Scope Stats -->
+<div class="grid grid-cols-3" style="margin-bottom: 2rem;">
+  <div class="card stat-card card-gradient-top">
+    <div class="stat-info">
+      <span class="stat-label">Global Scope</span>
+      <span class="stat-value" id="scope-global-count" style="color: #a5b4fc;">0</span>
+      <span class="stat-sub">Accessible program-wide</span>
+    </div>
+    <div class="stat-icon-wrapper purple">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+    </div>
+  </div>
+
+  <div class="card stat-card card-gradient-top">
+    <div class="stat-info">
+      <span class="stat-label">Local Scopes</span>
+      <span class="stat-value" id="scope-local-count" style="color: #67e8f9;">0</span>
+      <span class="stat-sub">Functions & nested blocks</span>
+    </div>
+    <div class="stat-icon-wrapper cyan">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+    </div>
+  </div>
+
+  <div class="card stat-card card-gradient-top">
+    <div class="stat-info">
+      <span class="stat-label">Unique Scope Contexts</span>
+      <span class="stat-value" id="scope-unique-count" style="color: #34d399;">0</span>
+      <span class="stat-sub">Distinct execution frames</span>
+    </div>
+    <div class="stat-icon-wrapper emerald">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+    </div>
+  </div>
+</div>
+
+<!-- Scope Distribution Ratio Bar -->
+<div class="card" style="margin-bottom: 2rem;">
+  <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem; font-weight: 600;">
+    <span style="color: #a5b4fc;">Global Scope (<span id="ratio-global-pct">0</span>%)</span>
+    <span style="color: #67e8f9;">Local Scope (<span id="ratio-local-pct">0</span>%)</span>
+  </div>
+  <div style="height: 12px; border-radius: 9999px; background: #1f2937; overflow: hidden; display: flex;">
+    <div id="ratio-bar-global" style="height: 100%; width: 50%; background: linear-gradient(90deg, #6366f1, #8b5cf6); transition: width 0.4s ease;"></div>
+    <div id="ratio-bar-local" style="height: 100%; width: 50%; background: linear-gradient(90deg, #06b6d4, #3b82f6); transition: width 0.4s ease;"></div>
+  </div>
+</div>
+
+<!-- Scope Tree Hierarchy Visualizer (Task 16) -->
+<div class="card card-gradient-top" style="margin-bottom: 2rem;">
+  <h2 class="card-title">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="20" height="20">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+    </svg>
+    Lexical Scope Hierarchy Tree
+  </h2>
+  <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+    Visualizes lexical nesting: Current Scope &rarr; Parent Scope &rarr; Grandparent Scope &rarr; Global.
+  </div>
+  <div id="scope-tree-container" style="background: #0d1117; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; font-family: var(--font-mono); font-size: 0.9rem; line-height: 1.8; color: #e2e8f0; overflow-x: auto;">
+    Loading scope hierarchy tree...
+  </div>
+</div>
+
+<!-- Scope Grouped Containers -->
+<div id="scopes-container" class="grid grid-cols-2">
+  <div class="card" style="grid-column: span 2; text-align: center; color: var(--text-muted); padding: 3rem;">
+    Loading scope hierarchy...
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadScopeAnalysis() {
+  try {
+    const [statsRes, symsRes, scopesRes] = await Promise.all([
+      fetch('/api/stats'),
+      fetch('/symbols'),
+      fetch('/api/scopes')
+    ]);
+
+    const stats = statsRes.ok ? await statsRes.json() : { global: 0, local: 0, total: 0 };
+    const symbols = symsRes.ok ? await symsRes.json() : [];
+    const scopeHierarchy = scopesRes.ok ? await scopesRes.json() : {};
+
+    // Group symbols by scope
+    const grouped = {};
+    symbols.forEach(sym => {
+      const s = sym.scope || 'global';
+      if (!grouped[s]) grouped[s] = [];
+      grouped[s].push(sym);
+    });
+
+    const uniqueScopes = Object.keys(grouped).length;
+    document.getElementById('scope-global-count').innerText = stats.global;
+    document.getElementById('scope-local-count').innerText = stats.local;
+    document.getElementById('scope-unique-count').innerText = uniqueScopes;
+
+    const total = stats.total || (stats.global + stats.local);
+    const globalPct = total > 0 ? Math.round((stats.global / total) * 100) : 50;
+    const localPct = total > 0 ? 100 - globalPct : 50;
+
+    document.getElementById('ratio-global-pct').innerText = total > 0 ? globalPct : 0;
+    document.getElementById('ratio-local-pct').innerText = total > 0 ? localPct : 0;
+    document.getElementById('ratio-bar-global').style.width = `${globalPct}%`;
+    document.getElementById('ratio-bar-local').style.width = `${localPct}%`;
+
+    renderScopeTree(grouped);
+    renderScopeCards(grouped);
+    updateNavStats();
+  } catch (err) {
+    showToast('Failed to load scope analysis: ' + err.message, 'error');
+  }
+}
+
+function renderScopeTree(grouped) {
+  const container = document.getElementById('scope-tree-container');
+  const allScopes = Object.keys(grouped);
+
+  if (allScopes.length === 0) {
+    container.innerHTML = '<span style="color: var(--text-muted);">No symbols in table. Run Code Analyzer to inspect scopes.</span>';
+    return;
+  }
+
+  // Build tree from scope strings (e.g. global -> calculate -> calculate.if.1 -> calculate.if.1.for.1)
+  const treeLines = [];
+  treeLines.push('<span style="color: #a855f7; font-weight: 700;">🌐 GLOBAL</span>');
+
+  const nonGlobal = allScopes.filter(s => s.toLowerCase() !== 'global').sort();
+
+  nonGlobal.forEach((s, idx) => {
+    const parts = s.split('.');
+    const depth = parts.length;
+    const indent = '&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(depth - 1);
+    const branchChar = (idx === nonGlobal.length - 1) ? '└── ' : '├── ';
+    const count = grouped[s].length;
+    const varNames = grouped[s].map(sym => sym.name).join(', ');
+
+    treeLines.push(
+      `${indent}<span style="color: #64748b;">${branchChar}</span>` +
+      `<strong style="color: #38bdf8;">${escapeHtml(s)}</strong> ` +
+      `<span style="color: #94a3b8; font-size: 0.8rem;">(${count} var${count === 1 ? '' : 's'}: <em>${escapeHtml(varNames)}</em>)</span>`
+    );
+  });
+
+  container.innerHTML = treeLines.join('<br>');
+}
+
+function renderScopeCards(grouped) {
+  const container = document.getElementById('scopes-container');
+  container.innerHTML = '';
+
+  const scopes = Object.keys(grouped);
+  if (scopes.length === 0) {
+    container.innerHTML = `
+      <div class="card" style="grid-column: span 2; text-align: center; color: var(--text-muted); padding: 3rem;">
+        No scoped symbols found. Add identifiers or analyze code to inspect scope boundaries.
+      </div>
+    `;
+    return;
+  }
+
+  // Ensure 'global' comes first if present
+  scopes.sort((a, b) => {
+    if (a.toLowerCase() === 'global') return -1;
+    if (b.toLowerCase() === 'global') return 1;
+    return a.localeCompare(b);
+  });
+
+  scopes.forEach(scopeName => {
+    const list = grouped[scopeName];
+    const isGlobal = scopeName.toLowerCase() === 'global';
+    
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    let tableRows = '';
+    list.forEach(sym => {
+      const baseType = (sym.type || 'int').toLowerCase().replace(/[*\[\]]/g, '');
+      const typeClass = `badge-${baseType}` in {'badge-int':1,'badge-float':1,'badge-char':1,'badge-double':1}
+        ? `badge-${baseType}` : 'badge-void';
+
+      tableRows += `
+        <tr>
+          <td><span class="sym-name">${escapeHtml(sym.name)}</span></td>
+          <td><span class="badge ${typeClass}">${escapeHtml(sym.type)}</span></td>
+          <td><span class="badge" style="font-size: 0.7rem; color: #94a3b8; text-transform: lowercase;">${escapeHtml(sym.token_type || 'identifier')}</span></td>
+          <td><span class="sym-val">${escapeHtml(sym.value !== null && sym.value !== undefined ? sym.value : 'null')}</span></td>
+          <td style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted);">Line ${sym.line}</td>
+          <td><span class="badge badge-hash">Bucket #${sym.hash_index}</span></td>
+        </tr>
+      `;
+    });
+
+    card.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <span class="badge ${isGlobal ? 'badge-scope-global' : 'badge-scope-local'}" style="font-size: 0.85rem; padding: 0.3rem 0.75rem;">
+            ${isGlobal ? 'GLOBAL' : 'LOCAL SCOPE'}
+          </span>
+          <strong style="font-family: var(--font-mono); font-size: 1.05rem; color: #fff;">${escapeHtml(scopeName)}</strong>
+        </div>
+        <span style="font-size: 0.8rem; color: var(--text-secondary);">${list.length} variable${list.length === 1 ? '' : 's'}</span>
+      </div>
+
+      <div class="table-container" style="border: none;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Variable</th>
+              <th>Type</th>
+              <th>Role</th>
+              <th>Value</th>
+              <th>Line</th>
+              <th>Hash Index</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    container.appendChild(card);
+  });
+}
+
+function escapeHtml(text) {
+  if (text === null || text === undefined) return '';
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+document.addEventListener('DOMContentLoaded', loadScopeAnalysis);
+</script>
+{% endblock %}

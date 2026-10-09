@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+
+{% block title %}Insert Symbol | Compiler Design{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title-group">
+    <h1>
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="30" height="30" style="color: var(--accent-emerald);">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      Insert Symbol to Table
+    </h1>
+    <p>Manually insert an identifier token into the compiler's separate chaining hash table.</p>
+  </div>
+  <div class="page-actions">
+    <a href="/symbols-page" class="btn btn-secondary">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+      </svg>
+      Back to Symbol Table
+    </a>
+  </div>
+</div>
+
+<div class="grid grid-cols-2">
+  <!-- Insert Form Card -->
+  <div class="card card-gradient-top">
+    <h2 class="card-title">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="20" height="20">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+      Identifier Attributes
+    </h2>
+
+    <form id="add-symbol-form" onsubmit="submitAddSymbol(event)">
+      <!-- Name -->
+      <div class="form-group">
+        <label class="form-label" for="sym-name">
+          <span>Identifier Name (Token Lexeme) *</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">e.g. `var_name`, `pi`</span>
+        </label>
+        <input 
+          type="text" 
+          id="sym-name" 
+          class="form-input mono" 
+          placeholder="e.g. total_sum" 
+          required 
+          pattern="^[a-zA-Z_][a-zA-Z0-9_]*$" 
+          title="Must be a valid identifier (starts with letter or underscore)"
+          oninput="updateHashPreview()"
+        >
+      </div>
+
+      <!-- Datatype -->
+      <div class="form-group">
+        <label class="form-label" for="sym-type">Data Type *</label>
+        <select id="sym-type" class="form-select" required onchange="updateRecordPreview()">
+          <option value="int">int (Integer, 4 bytes)</option>
+          <option value="float">float (Single-precision float, 4 bytes)</option>
+          <option value="double">double (Double-precision float, 8 bytes)</option>
+          <option value="char">char (Character, 1 byte)</option>
+          <option value="void">void (No type / function return)</option>
+        </select>
+      </div>
+
+      <!-- Token Category -->
+      <div class="form-group">
+        <label class="form-label" for="sym-token-type">Token Category *</label>
+        <select id="sym-token-type" class="form-select" onchange="updateRecordPreview()">
+          <option value="identifier">identifier (Variable / Array)</option>
+          <option value="parameter">parameter (Function Argument)</option>
+          <option value="function">function (Subroutine identifier)</option>
+        </select>
+      </div>
+
+      <!-- Value -->
+      <div class="form-group">
+        <label class="form-label" for="sym-val">Initial Value</label>
+        <input 
+          type="text" 
+          id="sym-val" 
+          class="form-input mono" 
+          placeholder="e.g. 100 or 'A' or null"
+          oninput="updateRecordPreview()"
+        >
+      </div>
+
+      <!-- Scope -->
+      <div class="form-group">
+        <label class="form-label" for="sym-scope">
+          <span>Scope / Function Context *</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Select or type custom scope</span>
+        </label>
+        <input 
+          type="text" 
+          id="sym-scope" 
+          class="form-input mono" 
+          value="global" 
+          required
+          oninput="updateRecordPreview()"
+        >
+        <!-- Scope Presets -->
+        <div style="display: flex; gap: 0.5rem; margin-top: 0.4rem; flex-wrap: wrap;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setScope('global')">global</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setScope('main()')">main()</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setScope('calculate()')">calculate()</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setScope('render()')">render()</button>
+        </div>
+      </div>
+
+      <!-- Line Number -->
+      <div class="form-group">
+        <label class="form-label" for="sym-line">Source Code Line Number *</label>
+        <input 
+          type="number" 
+          id="sym-line" 
+          class="form-input mono" 
+          value="1" 
+          min="1" 
+          required
+          oninput="updateRecordPreview()"
+        >
+      </div>
+
+      <div style="display: flex; gap: 0.75rem; margin-top: 2rem;">
+        <button type="submit" class="btn btn-gradient" style="flex: 1;">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          Insert to Symbol Table
+        </button>
+        <button type="reset" class="btn btn-secondary" onclick="resetForm()">Reset</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Live Educational Hash & Record Inspector -->
+  <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+    <!-- Live Hash Calculator Card -->
+    <div class="card card-gradient-top">
+      <h2 class="card-title">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="20" height="20" style="color: var(--accent-cyan);">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+        </svg>
+        Live Hash Calculation
+      </h2>
+      
+      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+        Watch the compiler calculate the ASCII key sum and bucket index in real-time as you type.
+      </p>
+
+      <div style="background: rgba(0,0,0,0.35); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Target Hash Bucket</span>
+          <span class="badge badge-hash" id="preview-bucket-badge" style="font-size: 0.9rem;">Bucket #0</span>
+        </div>
+
+        <div style="margin: 0.75rem 0;">
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">ASCII Breakdown Formula:</div>
+          <div id="preview-hash-formula" style="font-family: var(--font-mono); font-size: 0.85rem; color: #38bdf8; word-break: break-all;">
+            Enter an identifier name...
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.06); font-family: var(--font-mono); font-size: 0.8rem;">
+          <div>
+            <span style="color: var(--text-muted);">ASCII Sum:</span>
+            <strong id="preview-ascii-sum" style="color: #fcd34d;">0</strong>
+          </div>
+          <div>
+            <span style="color: var(--text-muted);">Modulo:</span>
+            <strong style="color: var(--accent-emerald);">% 10</strong>
+          </div>
+          <div>
+            <span style="color: var(--text-muted);">Assigned Index:</span>
+            <strong id="preview-target-index" style="color: #a5b4fc;">0</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Symbol Record Preview Card -->
+    <div class="card">
+      <h2 class="card-title">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="20" height="20">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+        </svg>
+        Compiler Memory Node Structure
+      </h2>
+
+      <div style="background: #0f172a; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; font-family: var(--font-mono); font-size: 0.825rem;">
+        <span style="color: #64748b;">// Symbol Table Entry (C Linked List Node representation)</span><br>
+        <span style="color: #c084fc;">struct</span> <span style="color: #38bdf8;">SymbolNode</span> {<br>
+        &nbsp;&nbsp;<span style="color: #60a5fa;">char*</span> key; <span style="color: #64748b;">// "<span id="code-key">total_sum</span>"</span><br>
+        &nbsp;&nbsp;<span style="color: #60a5fa;">char*</span> type; <span style="color: #64748b;">// "<span id="code-type">int</span>"</span><br>
+        &nbsp;&nbsp;<span style="color: #60a5fa;">char*</span> value; <span style="color: #64748b;">// "<span id="code-value">null</span>"</span><br>
+        &nbsp;&nbsp;<span style="color: #60a5fa;">char*</span> scope; <span style="color: #64748b;">// "<span id="code-scope">global</span>"</span><br>
+        &nbsp;&nbsp;<span style="color: #60a5fa;">int</span> line; <span style="color: #64748b;">// <span id="code-line">1</span></span><br>
+        &nbsp;&nbsp;<span style="color: #c084fc;">struct</span> <span style="color: #38bdf8;">SymbolNode</span>* next;<br>
+        };
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function setScope(scopeName) {
+  document.getElementById('sym-scope').value = scopeName;
+  updateRecordPreview();
+}
+
+function updateHashPreview() {
+  const name = document.getElementById('sym-name').value.trim();
+  const hash = calculateHashDetails(name, 10);
+
+  if (!name) {
+    document.getElementById('preview-bucket-badge').innerText = 'Bucket #--';
+    document.getElementById('preview-hash-formula').innerText = 'Enter an identifier name...';
+    document.getElementById('preview-ascii-sum').innerText = '0';
+    document.getElementById('preview-target-index').innerText = '--';
+  } else {
+    document.getElementById('preview-bucket-badge').innerText = `Bucket #${hash.index}`;
+    document.getElementById('preview-hash-formula').innerText = hash.breakdown;
+    document.getElementById('preview-ascii-sum').innerText = hash.asciiSum;
+    document.getElementById('preview-target-index').innerText = hash.index;
+  }
+
+  updateRecordPreview();
+}
+
+function updateRecordPreview() {
+  const name = document.getElementById('sym-name').value.trim() || 'identifier';
+  const type = document.getElementById('sym-type').value;
+  const value = document.getElementById('sym-val').value.trim() || 'null';
+  const scope = document.getElementById('sym-scope').value.trim() || 'global';
+  const line = document.getElementById('sym-line').value || '1';
+
+  document.getElementById('code-key').innerText = name;
+  document.getElementById('code-type').innerText = type;
+  document.getElementById('code-value').innerText = value;
+  document.getElementById('code-scope').innerText = scope;
+  document.getElementById('code-line').innerText = line;
+}
+
+function resetForm() {
+  setTimeout(() => {
+    updateHashPreview();
+    updateRecordPreview();
+  }, 50);
+}
+
+async function submitAddSymbol(event) {
+  event.preventDefault();
+
+  const name = document.getElementById('sym-name').value.trim();
+  const type = document.getElementById('sym-type').value;
+  const token_type = document.getElementById('sym-token-type').value;
+  const value = document.getElementById('sym-val').value.trim() || 'null';
+  const scope = document.getElementById('sym-scope').value.trim();
+  const line = parseInt(document.getElementById('sym-line').value, 10) || 1;
+
+  const payload = { name, type, token_type, value, scope, line };
+
+  try {
+    const res = await fetch('/add-symbol', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await res.json();
+    if (res.ok) {
+      showToast(result.message || `Symbol '${name}' added successfully!`, 'success');
+      document.getElementById('sym-name').value = '';
+      document.getElementById('sym-val').value = '';
+      updateHashPreview();
+      updateNavStats();
+    } else {
+      showToast(result.error || 'Failed to add symbol.', 'error');
+    }
+  } catch (err) {
+    showToast('Insertion error: ' + err.message, 'error');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  updateHashPreview();
+  updateRecordPreview();
+});
+</script>
+{% endblock %}

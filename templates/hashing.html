@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}Hash Visualizer | Compiler Design{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title-group">
+    <h1>
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="30" height="30" style="color: var(--accent-purple);">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+      </svg>
+      Separate Chaining Hash Visualizer
+    </h1>
+    <p>Interactive visualization of compiler hash buckets (0–9) and linked-list collision chains.</p>
+  </div>
+  <div class="page-actions">
+    <button onclick="fetchHashState()" class="btn btn-secondary">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+      </svg>
+      Refresh Buckets
+    </button>
+  </div>
+</div>
+
+<!-- Interactive Hash Calculator Testbench -->
+<div class="card card-gradient-top" style="margin-bottom: 2rem;">
+  <h2 class="card-title">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="20" height="20">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+    </svg>
+    Interactive Hash Calculator Tool
+  </h2>
+  <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem; align-items: center;">
+    <div>
+      <label class="form-label" for="test-key-input">Test Identifier Key:</label>
+      <input 
+        type="text" 
+        id="test-key-input" 
+        class="form-input mono" 
+        placeholder="Type any identifier name (e.g. 'counter', 'x', 'temp')" 
+        oninput="runTestHash()"
+      >
+    </div>
+    <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.85rem 1rem;">
+      <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 0.25rem;">
+        Hash Function: <code>sum(ord(c)) % 10</code>
+      </div>
+      <div id="test-hash-output" style="font-family: var(--font-mono); font-size: 0.9rem; color: #38bdf8;">
+        Type an identifier name on the left to calculate hash index...
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Collision Metrics -->
+<div class="grid grid-cols-4" style="margin-bottom: 2rem;">
+  <div class="card stat-card">
+    <div class="stat-info">
+      <span class="stat-label">Total Buckets</span>
+      <span class="stat-value">10</span>
+      <span class="stat-sub">Fixed Array Size</span>
+    </div>
+    <div class="stat-icon-wrapper blue">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </div>
+  </div>
+
+  <div class="card stat-card">
+    <div class="stat-info">
+      <span class="stat-label">Occupied Buckets</span>
+      <span class="stat-value" id="stat-occupied" style="color: var(--accent-emerald);">0</span>
+      <span class="stat-sub">Active slots</span>
+    </div>
+    <div class="stat-icon-wrapper emerald">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+    </div>
+  </div>
+
+  <div class="card stat-card">
+    <div class="stat-info">
+      <span class="stat-label">Collisions</span>
+      <span class="stat-value" id="stat-collisions" style="color: var(--accent-amber);">0</span>
+      <span class="stat-sub">Buckets with > 1 node</span>
+    </div>
+    <div class="stat-icon-wrapper amber">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+    </div>
+  </div>
+
+  <div class="card stat-card">
+    <div class="stat-info">
+      <span class="stat-label">Max Chain Length</span>
+      <span class="stat-value" id="stat-max-chain">0</span>
+      <span class="stat-sub">Longest linked list</span>
+    </div>
+    <div class="stat-icon-wrapper purple">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+    </div>
+  </div>
+</div>
+
+<!-- Buckets List -->
+<div class="card" style="margin-bottom: 2rem;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <h2 class="card-title">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="20" height="20">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+      </svg>
+      Hash Buckets & Linked Lists
+    </h2>
+    <span style="font-size: 0.8rem; color: var(--text-muted);">Format: [ Bucket Index ] &rarr; [ Linked List Nodes ] &rarr; NULL</span>
+  </div>
+
+  <div class="hash-visualizer" id="buckets-visualizer-container">
+    <div style="text-align: center; color: var(--text-muted); padding: 3rem;">
+      Loading hash table state...
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let highlightIndex = null;
+
+function runTestHash() {
+  const key = document.getElementById('test-key-input').value.trim();
+  const out = document.getElementById('test-hash-output');
+  if (!key) {
+    out.innerText = "Type an identifier name on the left to calculate hash index...";
+    highlightIndex = null;
+    clearBucketHighlights();
+    return;
+  }
+
+  const res = calculateHashDetails(key, 10);
+  out.innerHTML = `
+    <strong>${escapeHtml(key)}</strong>: 
+    ${res.charList.join(' + ')} = <span style="color: #fcd34d;">${res.asciiSum}</span> % 10 = 
+    <span style="color: #67e8f9; font-weight: 700; font-size: 1.05rem;">Bucket #${res.index}</span>
+  `;
+  highlightIndex = res.index;
+  applyBucketHighlight();
+}
+
+function applyBucketHighlight() {
+  clearBucketHighlights();
+  if (highlightIndex === null) return;
+  const row = document.getElementById(`bucket-row-${highlightIndex}`);
+  if (row) {
+    row.style.borderColor = 'var(--accent-cyan)';
+    row.style.background = 'rgba(6, 182, 212, 0.12)';
+    row.style.boxShadow = '0 0 15px rgba(6, 182, 212, 0.25)';
+  }
+}
+
+function clearBucketHighlights() {
+  for (let i = 0; i < 10; i++) {
+    const row = document.getElementById(`bucket-row-${i}`);
+    if (row) {
+      row.style.borderColor = '';
+      row.style.background = '';
+      row.style.boxShadow = '';
+    }
+  }
+}
+
+async function fetchHashState() {
+  try {
+    const [hashRes, symsRes] = await Promise.all([
+      fetch('/hash-table'),
+      fetch('/symbols')
+    ]);
+
+    if (!hashRes.ok) throw new Error('Could not fetch hash table');
+    const hashData = await hashRes.json();
+    const symbols = symsRes.ok ? await symsRes.json() : [];
+
+    // Map symbol details by key for richer display
+    const symbolMap = {};
+    symbols.forEach(s => { symbolMap[s.name] = s; });
+
+    renderBuckets(hashData.state, symbolMap);
+    updateNavStats();
+  } catch (err) {
+    showToast('Failed to load hash visualizer: ' + err.message, 'error');
+  }
+}
+
+function renderBuckets(state, symbolMap) {
+  const container = document.getElementById('buckets-visualizer-container');
+  container.innerHTML = '';
+
+  let occupied = 0;
+  let collisions = 0;
+  let maxChain = 0;
+
+  state.forEach(bucket => {
+    const chain = bucket.chain || [];
+    const count = chain.length;
+    if (count > 0) occupied++;
+    if (count > 1) collisions++;
+    if (count > maxChain) maxChain = count;
+
+    const row = document.createElement('div');
+    row.className = 'hash-bucket-row';
+    row.id = `bucket-row-${bucket.index}`;
+
+    let chainHtml = '';
+    const nodeList = bucket.nodes || (bucket.chain || []).map(k => ({ name: k, type: (symbolMap[k] ? symbolMap[k].type : 'id'), value: (symbolMap[k] ? symbolMap[k].value : ''), scope: (symbolMap[k] ? symbolMap[k].scope : 'global') }));
+
+    if (nodeList.length === 0) {
+      chainHtml = `
+        <span class="chain-empty">Empty bucket</span>
+        <span class="chain-arrow">&rarr;</span>
+        <span class="chain-null">NULL</span>
+      `;
+    } else {
+      nodeList.forEach((node) => {
+        const nameStr = node.name || 'id';
+        const typeStr = node.type || 'id';
+        const valStr = node.value !== null && node.value !== undefined ? String(node.value) : '';
+        const scopeStr = node.scope || 'global';
+        const isGlobal = scopeStr.toLowerCase() === 'global';
+
+        chainHtml += `
+          <div class="chain-node" title="Key: ${escapeHtml(nameStr)} | Scope: ${escapeHtml(scopeStr)} | Type: ${escapeHtml(typeStr)}">
+            <span style="color: #60a5fa; font-weight: 700;">${escapeHtml(nameStr)}</span>
+            <span style="font-size: 0.7rem; color: ${isGlobal ? '#a5b4fc' : '#67e8f9'}; background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 3px;">@${escapeHtml(scopeStr)}</span>
+            <span style="font-size: 0.72rem; color: #94a3b8; background: rgba(255,255,255,0.04); padding: 1px 4px; border-radius: 3px;">${escapeHtml(typeStr)}</span>
+            ${valStr ? `<span style="font-size: 0.75rem; color: #fcd34d;">=${escapeHtml(valStr)}</span>` : ''}
+          </div>
+          <span class="chain-arrow" style="color: #64748b;">&rarr;</span>
+        `;
+      });
+      chainHtml += `<span class="chain-null">NULL</span>`;
+    }
+
+    row.innerHTML = `
+      <div class="bucket-header">
+        <div class="bucket-index">#${bucket.index}</div>
+        <div>
+          <div class="bucket-label">Bucket ${bucket.index}</div>
+          ${count > 1 ? `<span class="badge badge-char" style="font-size: 0.65rem; padding: 1px 5px;">Collision (${count})</span>` : ''}
+        </div>
+      </div>
+      <div class="chain-list">
+        ${chainHtml}
+      </div>
+    `;
+
+    container.appendChild(row);
+  });
+
+  document.getElementById('stat-occupied').innerText = occupied;
+  document.getElementById('stat-collisions').innerText = collisions;
+  document.getElementById('stat-max-chain').innerText = maxChain;
+
+  applyBucketHighlight();
+}
+
+function escapeHtml(text) {
+  if (text === null || text === undefined) return '';
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+document.addEventListener('DOMContentLoaded', fetchHashState);
+</script>
+{% endblock %}
